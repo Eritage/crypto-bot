@@ -69,35 +69,37 @@ bot.start((ctx) => {
   );
 });
 
-// COMMAND: /add btc 
-bot.command('add', async (ctx) => {
-    // FIX: Use split() to get the text after the command
-    const parts = ctx.message.text.split(' '); 
-    const rawInput = parts[1]; // Get the second part (the symbol)
+// COMMAND: /add btc
+bot.command("add", async (ctx) => {
+  // FIX: Use split() to get the text after the command
+  const parts = ctx.message.text.split(" ");
+  const rawInput = parts[1]; // Get the second part (the symbol)
 
-    if (!rawInput) return ctx.reply('Please provide a symbol. Ex: /add btc');
+  if (!rawInput) return ctx.reply("Please provide a symbol. Ex: /add btc");
 
-    const inputLower = rawInput.toLowerCase();
+  const inputLower = rawInput.toLowerCase();
 
-    // Resolve symbol to ID (btc -> bitcoin)
-    const coinId = coinMap.has(inputLower) ? coinMap.get(inputLower) : inputLower;
+  // Resolve symbol to ID (btc -> bitcoin)
+  const coinId = coinMap.has(inputLower) ? coinMap.get(inputLower) : inputLower;
 
-    try {
-        const user = await getUser(ctx);
-        
-        // Prevent duplicates
-        if (user.favorites.includes(coinId)) {
-            return ctx.reply(`You are already watching ${coinId.toUpperCase()}.`);
-        }
+  try {
+    const user = await getUser(ctx);
 
-        user.favorites.push(coinId);
-        await user.save();
-        
-        ctx.reply(`Added <b>${coinId}</b> to your watch-list!`, { parse_mode: 'HTML' });
-    } catch (err) {
-        console.error(err);
-        ctx.reply('Database error.');
+    // Prevent duplicates
+    if (user.favorites.includes(coinId)) {
+      return ctx.reply(`You are already watching ${coinId.toUpperCase()}.`);
     }
+
+    user.favorites.push(coinId);
+    await user.save();
+
+    ctx.reply(`Added <b>${coinId}</b> to your watch-list!`, {
+      parse_mode: "HTML",
+    });
+  } catch (err) {
+    console.error(err);
+    ctx.reply("Database error.");
+  }
 });
 
 // COMMAND: /watch-list
@@ -163,33 +165,35 @@ bot.command("price", async (ctx) => {
   }
 });
 
-// COMMAND: /remove  
-bot.command('remove', async (ctx) => {
-    const parts = ctx.message.text.split(' ');
-    const rawInput = parts[1];
+// COMMAND: /remove
+bot.command("remove", async (ctx) => {
+  const parts = ctx.message.text.split(" ");
+  const rawInput = parts[1];
 
-    if (!rawInput) return ctx.reply('Ex: /remove btc');
+  if (!rawInput) return ctx.reply("Ex: /remove btc");
 
-    const inputLower = rawInput.toLowerCase();
-    const coinId = coinMap.has(inputLower) ? coinMap.get(inputLower) : inputLower;
+  const inputLower = rawInput.toLowerCase();
+  const coinId = coinMap.has(inputLower) ? coinMap.get(inputLower) : inputLower;
 
-    try {
-        const user = await getUser(ctx);
-        
-        // Check if coin exists in favorites
-        if (!user.favorites.includes(coinId)) {
-            return ctx.reply(`${coinId} is not in your watch-list.`);
-        }
+  try {
+    const user = await getUser(ctx);
 
-        // Filter it out (Create a new array without that coin)
-        user.favorites = user.favorites.filter(id => id !== coinId);
-        await user.save();
-        
-        ctx.reply(`Removed <b>${coinId}</b> from your watch-list.`, { parse_mode: 'HTML' });
-    } catch (err) {
-        console.error(err);
-        ctx.reply('Database error.');
+    // Check if coin exists in favorites
+    if (!user.favorites.includes(coinId)) {
+      return ctx.reply(`${coinId} is not in your watch-list.`);
     }
+
+    // Filter it out (Create a new array without that coin)
+    user.favorites = user.favorites.filter((id) => id !== coinId);
+    await user.save();
+
+    ctx.reply(`Removed <b>${coinId}</b> from your watch-list.`, {
+      parse_mode: "HTML",
+    });
+  } catch (err) {
+    console.error(err);
+    ctx.reply("Database error.");
+  }
 });
 
 // Run initCoinList BEFORE launching the bot
