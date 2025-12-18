@@ -12,6 +12,11 @@ app.get("/", (req, res) => {
   res.send("Bot is alive!");
 });
 
+// START EXPRESS SERVER
+app.listen(port, () => {
+  console.log(`Server running on port ${port}`);
+});
+
 // MONGODB SETUP
 mongoose
   .connect(process.env.MONGO_URI)
@@ -215,7 +220,4 @@ initCoinList().then(() => {
 process.once("SIGINT", () => bot.stop("SIGINT"));
 process.once("SIGTERM", () => bot.stop("SIGTERM"));
 
-// START EXPRESS SERVER
-app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
-});
+
