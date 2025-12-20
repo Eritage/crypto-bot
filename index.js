@@ -328,6 +328,22 @@ setInterval(async () => {
   }
 }, 60000); // Run every 60,000ms (1 minute)
 
+// SET THE MENU COMMANDS
+bot.telegram.setMyCommands([
+  { command: "start", description: "Restart the bot" },
+  { command: "price", description: "Check coin price (ex: /price btc)" },
+  { command: "watchlist", description: "View your favorite coins" },
+  { command: "add", description: "Add coin to watchlist" },
+  { command: "remove", description: "Remove coin from watchlist" },
+  { command: "alert", description: "Set price alert (ex: /alert btc 100k)" },
+]);
+
+// Run initCoinList BEFORE launching the bot
+initCoinList().then(() => {
+  bot.launch();
+  console.log("Bot is running...");
+});
+
 // Run initCoinList BEFORE launching the bot
 initCoinList().then(() => {
   bot.launch();
