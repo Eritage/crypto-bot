@@ -28,6 +28,14 @@ const UserSchema = new mongoose.Schema({
   telegramId: { type: String, required: true, unique: true },
   firstName: String,
   favorites: [String], // We will store Coin IDs here (e.g. ['bitcoin', 'ethereum'])
+
+  alerts: [
+    {
+      coinId: String,
+      targetPrice: Number,
+      direction: String, // will store 'above' or 'below'
+    },
+  ],
 });
 
 const User = mongoose.model("User", UserSchema);
@@ -210,6 +218,116 @@ bot.command("remove", async (ctx) => {
   }
 });
 
+// COMMAND: /alert btc 90000
+bot.command("alert", async (ctx) => {
+  const parts = ctx.message.text.split(" ");
+  // Expected: ["/alert", "btc", "90000"]
+  const rawCoin = parts[1];
+  const targetPrice = parseFloat(parts[2]);
+
+  if (!rawCoin || !targetPrice) {
+    return ctx.reply(
+      "Usage: /alert <symbol> <price>\nExample: /alert btc 90000"
+    );
+  }
+
+  const inputLower = rawCoin.toLowerCase();
+  const coinId = coinMap.has(inputLower) ? coinMap.get(inputLower) : inputLower;
+
+  try {
+    // 1. Get current price to determine direction
+    const { data } = await axios.get(
+      `https://api.coingecko.com/api/v3/simple/price?ids=${coinId}&vs_currencies=usd`
+    );
+
+    if (!data[coinId]) return ctx.reply("Coin not found.");
+
+    const currentPrice = data[coinId].usd;
+
+    // 2. Determine if we are waiting for price to go UP or DOWN
+    const direction = targetPrice > currentPrice ? "above" : "below";
+
+    // 3. Save to DB
+    const user = await getUser(ctx);
+    user.alerts.push({
+      coinId,
+      targetPrice,
+      direction,
+    });
+    await user.save();
+
+    ctx.reply(
+      `Alert Set!\nI will message you when <b>${coinId}</b> goes <b>${direction} $${targetPrice}</b>.`,
+      { parse_mode: "HTML" }
+    );
+  } catch (err) {
+    console.error(err);
+    ctx.reply("Error setting alert.");
+  }
+});
+
+// --- BACKGROUND JOB: CHECK ALERTS EVERY 60 SECONDS ---
+setInterval(async () => {
+  try {
+    // 1. Find users who actually have alerts
+    const users = await User.find({ "alerts.0": { $exists: true } });
+    if (users.length === 0) return;
+
+    // 2. Collect all unique coin IDs to fetch prices in one API call
+    const coinSet = new Set();
+    users.forEach((u) => u.alerts.forEach((a) => coinSet.add(a.coinId)));
+
+    const ids = Array.from(coinSet).join(",");
+    const { data } = await axios.get(
+      `https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd`
+    );
+
+    // 3. Check every user's alerts
+    for (const user of users) {
+      let alertTriggered = false;
+
+      // We use a new array to keep only alerts that HAVEN'T fired yet
+      const remainingAlerts = [];
+
+      for (const alert of user.alerts) {
+        const price = data[alert.coinId]?.usd;
+        if (!price) {
+          remainingAlerts.push(alert); // Keep it if API failed
+          continue;
+        }
+
+        // CHECK CONDITION
+        let fired = false;
+        if (alert.direction === "above" && price >= alert.targetPrice)
+          fired = true;
+        if (alert.direction === "below" && price <= alert.targetPrice)
+          fired = true;
+
+        if (fired) {
+          // SEND NOTIFICATION
+          await bot.telegram.sendMessage(
+            user.telegramId,
+            `<b>ALERT TRIGGERED!</b> 🚨\n\n${alert.coinId.toUpperCase()} has reached <b>$${price}</b>\n(Target: ${alert.direction} $${alert.targetPrice})`,
+            { parse_mode: "HTML" }
+          );
+          alertTriggered = true;
+          // We DO NOT push this alert to remainingAlerts, so it is deleted (Fire & Forget)
+        } else {
+          remainingAlerts.push(alert); // Keep alert active
+        }
+      }
+
+      // 4. Update the user's DB only if something changed
+      if (alertTriggered) {
+        user.alerts = remainingAlerts;
+        await user.save();
+      }
+    }
+  } catch (e) {
+    console.error("Checker Error:", e.message);
+  }
+}, 60000); // Run every 60,000ms (1 minute)
+
 // Run initCoinList BEFORE launching the bot
 initCoinList().then(() => {
   bot.launch();
@@ -219,5 +337,3 @@ initCoinList().then(() => {
 // Graceful stop
 process.once("SIGINT", () => bot.stop("SIGINT"));
 process.once("SIGTERM", () => bot.stop("SIGTERM"));
-
-
