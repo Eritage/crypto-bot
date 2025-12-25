@@ -372,7 +372,7 @@ const shutdown = async (signal) => {
   // Force exit after 10 seconds
   setTimeout(() => {
     console.error("❌ Forced shutdown");
-    process.exit(1);
+    process.exit();
   }, 10000);
 };
 
